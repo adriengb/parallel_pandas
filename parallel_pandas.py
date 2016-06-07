@@ -3,7 +3,7 @@
 from multiprocessing import Pool
 import pandas as pd
 from functools import partial
-from os import system
+from os import system, makedirs
 from os.path import join, abspath
 
 def call_return_series(fn, series, **kwargs):
@@ -58,18 +58,27 @@ def apply_slurm(df, package_name, function_name, data_directory):
 
     """
     index_names = df.index.names
+    slurm_dir = abspath(join(data_directory, 'slurm'))
+    input_json_dir = abspath(join(data_directory, 'input_json'))
+    output_dir = abspath(join(data_directory, 'output'))
+    results_dir = abspath(join(data_directory, 'results'))
+    for directory in [slurm_dir, input_json_dir, output_dir, results_dir]:
+        try:
+            makedirs(directory)
+        except OSError:
+            pass
     for _, row in df.reset_index().iterrows():
         job_name = '%s_%s' % (function_name, '_'.join(str(row[x]) for x in index_names))
-        job_file = abspath(join(data_directory, '%s.sl' % job_name))
-        json_file = abspath(join(data_directory, '%s_input.json' % job_name))
-        output_file = abspath(join(data_directory, '%s.out' % job_name))
+        job_file = join(slurm_dir, '%s.sl' % job_name)
+        json_file = join(input_json_dir, '%s_input.json' % job_name)
+        output_file = join(output_dir, '%s.out' % job_name)
         row.to_json(json_file)
         with open(job_file, 'w') as outfile:
             outfile.write(SLURM_TEMPLATE)
             outfile.write('#SBATCH --output=%s\n' % output_file)
             outfile.write('#SBATCH --job-name=%s\n\n' % job_name)
             outfile.write(CMD_TEMPLATE.format(package_name, function_name,
-                                              json_file, data_directory))
+                                              json_file, results_dir))
             outfile.write('\n')
         system('chmod +x ' + job_file)
         system('sbatch ' + job_file)
