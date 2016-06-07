@@ -36,27 +36,39 @@ SLURM_TEMPLATE = """#!/bin/bash
 #SBATCH --time=01:00:00
 """
 
-CMD_TEMPLATE = """python -c "import {0},pandas; {0}.{1}(pandas.read_json('{2}', typ='series'))" """
+CMD_TEMPLATE = """
+python -c "import {0},pandas; {0}.{1}(pandas.read_json('{2}', typ='series'), '{3}')"
+"""
 
 def apply_slurm(df, package_name, function_name, data_directory):
-    """Parallel apply for pandas DataFrame using slurm.
+    """Parallel apply for pandas DataFrame using slurm. Does not return anything.
 
-    Argument fn cannot be a lambda function, but it can be generated with
-    functools.partial.
+    Arguments
+    ---------
 
-    Does not return anything.
+    df: A DataFrame to iterate through.
+
+    package_name: The name of the package containing function_name.
+
+    function_name: The name of a function in the package given by
+    package_name. The function should take two argumes: a pandas series and an
+    output directory.
+
+    data_directory: A directory to store all the data files.
 
     """
     index_names = df.index.names
     for _, row in df.reset_index().iterrows():
-        job_name = '%s_%s' % (function_name, '_'.join(row[x] for x in index_names))
+        job_name = '%s_%s' % (function_name, '_'.join(str(row[x]) for x in index_names))
         job_file = join(data_directory, '%s.sl' % job_name)
-        json_file = abspath(join(data_directory, '%s.json' % job_name))
+        json_file = abspath(join(data_directory, '%s_input.json' % job_name))
         row.to_json(json_file)
         with open(job_file, 'w') as outfile:
             outfile.write(SLURM_TEMPLATE)
             outfile.write('#SBATCH --output=slurmout_%s\n' % job_name)
             outfile.write('#SBATCH --job-name=%s\n\n' % job_name)
-            outfile.write(CMD_TEMPLATE.format(package_name, function, json_file))
+            outfile.write(CMD_TEMPLATE.format(package_name, function_name,
+                                              json_file, data_directory))
             outfile.write('\n')
+        system('chmod +x ' + job_file)
         system('sbatch ' + job_file)
