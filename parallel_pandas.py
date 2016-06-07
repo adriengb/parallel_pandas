@@ -60,12 +60,13 @@ def apply_slurm(df, package_name, function_name, data_directory):
     index_names = df.index.names
     for _, row in df.reset_index().iterrows():
         job_name = '%s_%s' % (function_name, '_'.join(str(row[x]) for x in index_names))
-        job_file = join(data_directory, '%s.sl' % job_name)
+        job_file = abspath(join(data_directory, '%s.sl' % job_name))
         json_file = abspath(join(data_directory, '%s_input.json' % job_name))
+        output_file = abspath(join(data_directory, '%s.out' % job_name))
         row.to_json(json_file)
         with open(job_file, 'w') as outfile:
             outfile.write(SLURM_TEMPLATE)
-            outfile.write('#SBATCH --output=slurmout_%s\n' % job_name)
+            outfile.write('#SBATCH --output=%s\n' % output_file)
             outfile.write('#SBATCH --job-name=%s\n\n' % job_name)
             outfile.write(CMD_TEMPLATE.format(package_name, function_name,
                                               json_file, data_directory))
