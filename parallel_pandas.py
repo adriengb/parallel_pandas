@@ -37,7 +37,7 @@ SLURM_TEMPLATE = """#!/bin/bash
 """
 
 CMD_TEMPLATE = """
-python -c "import {0},pandas; {0}.{1}(pandas.read_json('{2}', typ='series'), '{3}')"
+python -u -c "import {0},pandas; {0}.{1}(pandas.read_json('{2}', typ='series'), '{3}')"
 """
 
 def apply_slurm(df, package_name, function_name, data_directory):
